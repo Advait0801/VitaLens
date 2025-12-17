@@ -1,0 +1,153 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: vitalens-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vitalens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vitalens_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-vitalens_db}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vitalens}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vitalens-network
+
+  # Ollama Local LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: vitalens-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_KEEP_ALIVE=24h
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - vitalens-network
+    # Note: Models need to be pulled after container starts
+    # Run: docker exec vitalens-ollama ollama pull llama3.1
+    # or: docker exec vitalens-ollama ollama pull mistral
+
+  # ChromaDB Vector Database
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: vitalens-chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    volumes:
+      - chroma_data:/chroma/chroma
+    ports:
+      - "${CHROMA_PORT:-8001}:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - vitalens-network
+
+  # FastAPI Backend Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vitalens-api
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vitalens}:${POSTGRES_PASSWORD:-vitalens_dev_password}@postgres:5432/${POSTGRES_DB:-vitalens_db}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-vitalens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vitalens_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-vitalens_db}
+      
+      # JWT Configuration
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      
+      # Ollama Configuration
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1}
+      
+      # ChromaDB Configuration
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+      CHROMA_BASE_URL: http://chroma:8000
+      CHROMA_EXTERNAL_PORT: ${CHROMA_PORT:-8001}
+      
+      # Application Configuration
+      APP_NAME: VitaLens
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      API_V1_PREFIX: /api/v1
+      
+      # CORS Configuration
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-true}
+      
+      # File Upload Configuration
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-10485760}
+      UPLOAD_DIR: /app/uploads
+      
+      # OCR Configuration
+      OCR_ENGINE: ${OCR_ENGINE:-easyocr}
+      
+      # Python Configuration
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - .:/app
+      - api_uploads:/app/uploads
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      chroma:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - vitalens-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  ollama_data:
+    driver: local
+  chroma_data:
+    driver: local
+  api_uploads:
+    driver: local
+
+networks:
+  vitalens-network:
+    driver: bridge
+    name: vitalens-network
+

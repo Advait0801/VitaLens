@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from app.core.config import settings
 from app.core.database import engine, async_session_maker
+from app.api import auth, meals, nutrition
 
 
 @asynccontextmanager
@@ -95,10 +96,10 @@ async def health_check():
         )
 
 
-@app.get("/api/v1/health", tags=["Health"])
-async def health_check_v1():
-    """Versioned health check endpoint"""
-    return await health_check()
+# Include API routers
+app.include_router(auth.router, prefix=settings.API_PREFIX)
+app.include_router(meals.router, prefix=settings.API_PREFIX)
+app.include_router(nutrition.router, prefix=settings.API_PREFIX)
 
 
 if __name__ == "__main__":

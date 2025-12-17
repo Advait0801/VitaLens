@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Tesseract OCR
     tesseract-ocr \
     tesseract-ocr-eng \
+    # PDF processing
+    poppler-utils \
     # Image processing libraries (updated for Debian Trixie)
     libgl1 \
     libglib2.0-0 \

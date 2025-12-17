@@ -128,6 +128,8 @@ alembic/versions/*.pyc
 # Uploads directory (user-uploaded files)
 backend/uploads/*
 !backend/uploads/.gitkeep
+uploads/*
+!uploads/.gitkeep
 
 # IDE specific
 *.sublime-project

@@ -1,0 +1,579 @@
+{
+	"info": {
+		"_postman_id": "vitalens-api-collection",
+		"name": "VitaLens API",
+		"description": "Complete API collection for VitaLens - AI-powered nutrition and health insight application",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Check API health and database connectivity"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('user_id', response.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@example.com\",\n    \"username\": \"testuser\",\n    \"password\": \"testpass123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						},
+						"description": "Register a new user with email, username, and password"
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('access_token', response.access_token);",
+									"    pm.environment.set('refresh_token', response.refresh_token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username_or_email\": \"testuser\",\n    \"password\": \"testpass123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						},
+						"description": "Login with username or email and password to get access token"
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('access_token', response.access_token);",
+									"    pm.environment.set('refresh_token', response.refresh_token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/refresh",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"refresh"
+							]
+						},
+						"description": "Refresh access token using refresh token"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/me",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"me"
+							]
+						},
+						"description": "Get current authenticated user information"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Meals",
+			"item": [
+				{
+					"name": "Upload Meal (Image/PDF/CSV)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": [],
+									"description": "Upload image (jpg, png), PDF, or CSV file"
+								},
+								{
+									"key": "meal_type",
+									"value": "breakfast",
+									"type": "text",
+									"description": "Meal type: breakfast, lunch, dinner, snack, other"
+								},
+								{
+									"key": "meal_date",
+									"value": "2024-12-17T10:00:00",
+									"type": "text",
+									"description": "Optional: Meal date in ISO format"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/meals/upload?meal_type=breakfast",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"meals",
+								"upload"
+							],
+							"query": [
+								{
+									"key": "meal_type",
+									"value": "breakfast",
+									"description": "breakfast, lunch, dinner, snack, other"
+								}
+							]
+						},
+						"description": "Upload a meal image, PDF, or CSV file. The API will extract text using OCR and normalize food items using LLM."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Meal Manually",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('meal_id', response.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"meal_type\": \"lunch\",\n    \"source_type\": \"manual\",\n    \"notes\": \"Delicious lunch\",\n    \"meal_date\": \"2024-12-17T12:00:00\",\n    \"food_items\": [\n        {\n            \"name\": \"apple\",\n            \"quantity\": 1,\n            \"unit\": \"piece\",\n            \"brand\": null\n        },\n        {\n            \"name\": \"chicken breast\",\n            \"quantity\": 150,\n            \"unit\": \"g\",\n            \"brand\": null\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/meals",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"meals"
+							]
+						},
+						"description": "Create a meal manually with food items"
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Meals",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/meals?skip=0&limit=100&start_date=2024-12-01&end_date=2024-12-31",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"meals"
+							],
+							"query": [
+								{
+									"key": "skip",
+									"value": "0",
+									"description": "Number of records to skip"
+								},
+								{
+									"key": "limit",
+									"value": "100",
+									"description": "Maximum number of records to return"
+								},
+								{
+									"key": "start_date",
+									"value": "2024-12-01",
+									"description": "Optional: Filter meals from this date (YYYY-MM-DD)"
+								},
+								{
+									"key": "end_date",
+									"value": "2024-12-31",
+									"description": "Optional: Filter meals until this date (YYYY-MM-DD)"
+								}
+							]
+						},
+						"description": "Get all meals for the authenticated user with optional date filtering"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Meal by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/meals/{{meal_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"meals",
+								"{{meal_id}}"
+							]
+						},
+						"description": "Get a specific meal with all food items and nutrients"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Meal",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/meals/{{meal_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"meals",
+								"{{meal_id}}"
+							]
+						},
+						"description": "Delete a meal and all associated food items and nutrients"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Nutrition",
+			"item": [
+				{
+					"name": "Get Daily Nutrition",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/nutrition/daily?target_date=2024-12-17",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"nutrition",
+								"daily"
+							],
+							"query": [
+								{
+									"key": "target_date",
+									"value": "2024-12-17",
+									"description": "Optional: Date in YYYY-MM-DD format (defaults to today)"
+								}
+							]
+						},
+						"description": "Get daily nutrition summary for a specific date"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Nutrition Summary",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/nutrition/summary?days=7",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"nutrition",
+								"summary"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "7",
+									"description": "Number of days to summarize (default: 7)"
+								}
+							]
+						},
+						"description": "Get nutrition summary for the last N days with totals and averages"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Health Insights",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/nutrition/insights?days=7",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"nutrition",
+								"insights"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "7",
+									"description": "Number of days to analyze (default: 7)"
+								}
+							]
+						},
+						"description": "Get AI-generated health insights based on nutrition data using Ollama LLM"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refresh_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "meal_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
+

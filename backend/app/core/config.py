@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "VitaLens"
     APP_ENV: str = "development"
     DEBUG: bool = True
-    API_V1_PREFIX: str = "/api/v1"
+    API_PREFIX: str = ""
     
     # Database Configuration
     DATABASE_URL: Optional[str] = None

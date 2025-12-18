@@ -79,7 +79,6 @@ async def upload_meal(
     
     # Normalize food items using LLM
     normalized_data = await llm_service.normalize_food_text(raw_text)
-    food_items_data = normalized_data.get("food_items", [])
     
     # Create meal
     meal = Meal(
@@ -94,36 +93,65 @@ async def upload_meal(
     db.add(meal)
     await db.flush()
     
-    # Create food items and nutrients
-    for item_data in food_items_data:
+    # Handle nutrition label vs food items list
+    if normalized_data.get("is_nutrition_label"):
+        # Create a single food item from nutrition label
+        serving_size = normalized_data.get("serving_size", "1 serving")
+        nutrients_data = normalized_data.get("nutrients", [])
+        
         food_item = FoodItem(
             meal_id=meal.id,
-            name=item_data.get("name", ""),
-            normalized_name=item_data.get("name", ""),
-            quantity=item_data.get("quantity"),
-            unit=item_data.get("unit", "g"),
-            brand=item_data.get("brand")
+            name=f"Food item ({serving_size})",
+            normalized_name="nutrition_label_item",
+            quantity=1,
+            unit="serving",
+            description=f"Nutrition label - {serving_size}"
         )
         db.add(food_item)
         await db.flush()
         
-        # Get nutrition data
-        nutrition_data = nutrition_service.get_nutrition_data(
-            food_item.normalized_name or food_item.name,
-            food_item.quantity or 100,
-            food_item.unit or "g"
-        )
-        
-        # Create nutrient objects
-        for nutrient_name, value in nutrition_data.items():
+        # Create nutrients directly from label data
+        for nutrient_data in nutrients_data:
             nutrient = Nutrient(
                 food_item_id=food_item.id,
-                name=nutrient_name,
-                value=value,
-                unit=nutrition_service.nutrient_units.get(nutrient_name, "g"),
-                per_100g=value / (food_item.quantity / 100.0) if food_item.quantity and food_item.quantity > 0 else value
+                name=nutrient_data.get("name", "").lower().replace(" ", "_"),
+                value=float(nutrient_data.get("value", 0)),
+                unit=nutrient_data.get("unit", "g"),
+                per_100g=None  # Not applicable for nutrition labels
             )
             db.add(nutrient)
+    else:
+        # Handle regular food items list
+        food_items_data = normalized_data.get("food_items", [])
+        for item_data in food_items_data:
+            food_item = FoodItem(
+                meal_id=meal.id,
+                name=item_data.get("name", ""),
+                normalized_name=item_data.get("name", ""),
+                quantity=item_data.get("quantity"),
+                unit=item_data.get("unit", "g"),
+                brand=item_data.get("brand")
+            )
+            db.add(food_item)
+            await db.flush()
+            
+            # Get nutrition data from our database
+            nutrition_data = nutrition_service.get_nutrition_data(
+                food_item.normalized_name or food_item.name,
+                food_item.quantity or 100,
+                food_item.unit or "g"
+            )
+            
+            # Create nutrient objects
+            for nutrient_name, value in nutrition_data.items():
+                nutrient = Nutrient(
+                    food_item_id=food_item.id,
+                    name=nutrient_name,
+                    value=value,
+                    unit=nutrition_service.nutrient_units.get(nutrient_name, "g"),
+                    per_100g=value / (food_item.quantity / 100.0) if food_item.quantity and food_item.quantity > 0 else value
+                )
+                db.add(nutrient)
     
     await db.commit()
     await db.refresh(meal)

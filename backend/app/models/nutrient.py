@@ -18,8 +18,8 @@ class Nutrient(Base):
     value = Column(Float, nullable=False)  # Nutrient value
     unit = Column(String, nullable=False)  # e.g., "kcal", "g", "mg", "mcg"
     per_100g = Column(Float, nullable=True)  # Value per 100g for reference
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     food_item = relationship("FoodItem", back_populates="nutrients")

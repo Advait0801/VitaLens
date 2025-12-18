@@ -49,6 +49,13 @@ class NutrientResponse(NutrientBase):
         from_attributes = True
 
 
+class NutrientSummary(BaseModel):
+    """Schema for nutrient summary (without id/timestamps)"""
+    name: str
+    value: float
+    unit: str
+
+
 class MealBase(BaseModel):
     """Base schema for meal"""
     meal_type: MealType
@@ -78,6 +85,6 @@ class MealResponse(MealBase):
 
 
 class MealWithNutrients(MealResponse):
-    """Schema for meal with nutrients"""
-    total_nutrients: Optional[List[NutrientResponse]] = None
+    """Schema for meal with nutrient summary"""
+    total_nutrients: Optional[List[NutrientSummary]] = None
 

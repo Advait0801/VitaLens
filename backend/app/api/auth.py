@@ -85,9 +85,9 @@ async def login(credentials: LoginRequest, db: AsyncSession = Depends(get_db)):
             detail="Inactive user"
         )
     
-    # Create tokens
-    access_token = create_access_token(data={"sub": user.id, "username": user.username})
-    refresh_token = create_refresh_token(data={"sub": user.id, "username": user.username})
+    # Create tokens (sub must be string)
+    access_token = create_access_token(data={"sub": str(user.id), "username": user.username})
+    refresh_token = create_refresh_token(data={"sub": str(user.id), "username": user.username})
     
     return {
         "access_token": access_token,
@@ -106,28 +106,28 @@ async def refresh_token(token_data: RefreshTokenRequest):
             algorithms=[settings.JWT_ALGORITHM]
         )
         token_type: str = payload.get("type")
-        user_id: int = payload.get("sub")
+        user_id_str = payload.get("sub")
         username: str = payload.get("username")
         
-        if token_type != "refresh" or user_id is None:
+        if token_type != "refresh" or user_id_str is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token"
+                detail=f"Invalid token type: {token_type}, user_id: {user_id_str}"
             )
         
-        # Create new tokens
-        access_token = create_access_token(data={"sub": user_id, "username": username})
-        refresh_token = create_refresh_token(data={"sub": user_id, "username": username})
+        # Create new tokens (sub must be string)
+        access_token = create_access_token(data={"sub": user_id_str, "username": username})
+        new_refresh_token = create_refresh_token(data={"sub": user_id_str, "username": username})
         
         return {
             "access_token": access_token,
-            "refresh_token": refresh_token,
+            "refresh_token": new_refresh_token,
             "token_type": "bearer"
         }
-    except JWTError:
+    except JWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token"
+            detail=f"JWT decode error: {str(e)}"
         )
 
 

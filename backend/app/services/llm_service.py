@@ -18,17 +18,50 @@ class LLMService:
         """
         Normalize food text using LLM to extract structured food information.
         Returns a list of food items with normalized names and quantities.
+        Handles both food lists AND nutrition labels.
         """
-        prompt = f"""Extract food items from the following text and normalize them. 
-Return a JSON array of food objects, each with: name (normalized food name), quantity (number), unit (g, ml, pieces, etc.), and brand (if mentioned).
+        # Check if this looks like a nutrition label
+        is_nutrition_label = any(keyword in raw_text.lower() for keyword in 
+            ["nutrition facts", "calories", "total fat", "serving size", "daily value"])
+        
+        if is_nutrition_label:
+            prompt = f"""This is a nutrition facts label. Extract the nutritional information.
+Return a JSON object with:
+- "is_nutrition_label": true
+- "serving_size": the serving size text (e.g., "1 Tbsp (21g)")
+- "servings_per_container": number of servings
+- "nutrients": an array of nutrient objects, each with "name", "value" (number), and "unit"
 
 Text: {raw_text}
 
-Return only valid JSON array, no other text. Example format:
-[
-  {{"name": "apple", "quantity": 1, "unit": "piece", "brand": null}},
-  {{"name": "whole milk", "quantity": 250, "unit": "ml", "brand": "Organic Valley"}}
-]"""
+Return only valid JSON, no other text. Example:
+{{
+  "is_nutrition_label": true,
+  "serving_size": "1 cup (255g)",
+  "servings_per_container": 2,
+  "nutrients": [
+    {{"name": "calories", "value": 220, "unit": "kcal"}},
+    {{"name": "fat", "value": 5, "unit": "g"}},
+    {{"name": "carbs", "value": 35, "unit": "g"}},
+    {{"name": "protein", "value": 9, "unit": "g"}}
+  ]
+}}"""
+        else:
+            prompt = f"""Extract food items from the following text and normalize them. 
+Return a JSON object with:
+- "is_nutrition_label": false
+- "food_items": array of food objects, each with: name (normalized food name), quantity (number), unit (g, ml, pieces, etc.), and brand (if mentioned).
+
+Text: {raw_text}
+
+Return only valid JSON, no other text. Example:
+{{
+  "is_nutrition_label": false,
+  "food_items": [
+    {{"name": "apple", "quantity": 1, "unit": "piece", "brand": null}},
+    {{"name": "whole milk", "quantity": 250, "unit": "ml", "brand": "Organic Valley"}}
+  ]
+}}"""
         
         try:
             response = await self.client.post(
@@ -54,13 +87,33 @@ Return only valid JSON array, no other text. Example format:
                 elif "```" in response_text:
                     response_text = response_text.split("```")[1].split("```")[0]
                 
-                food_items = json.loads(response_text.strip())
-                return {"food_items": food_items if isinstance(food_items, list) else []}
+                parsed = json.loads(response_text.strip())
+                
+                # Handle nutrition label response
+                if isinstance(parsed, dict) and parsed.get("is_nutrition_label"):
+                    return {
+                        "is_nutrition_label": True,
+                        "serving_size": parsed.get("serving_size", "1 serving"),
+                        "servings_per_container": parsed.get("servings_per_container", 1),
+                        "nutrients": parsed.get("nutrients", []),
+                        "food_items": []
+                    }
+                # Handle food items list response
+                elif isinstance(parsed, dict) and "food_items" in parsed:
+                    return {
+                        "is_nutrition_label": False,
+                        "food_items": parsed.get("food_items", [])
+                    }
+                # Handle raw array (legacy format)
+                elif isinstance(parsed, list):
+                    return {"is_nutrition_label": False, "food_items": parsed}
+                else:
+                    return {"is_nutrition_label": False, "food_items": []}
             except json.JSONDecodeError:
-                return {"food_items": []}
+                return {"is_nutrition_label": False, "food_items": []}
         except Exception as e:
             print(f"LLM normalization failed: {e}")
-            return {"food_items": []}
+            return {"is_nutrition_label": False, "food_items": []}
     
     async def generate_health_insight(
         self,

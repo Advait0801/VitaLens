@@ -40,6 +40,6 @@ class RiskScore(Base):
     explanation = Column(Text, nullable=True)  # LLM-generated explanation
     recommendation = Column(Text, nullable=True)  # LLM-generated recommendation
     calculated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

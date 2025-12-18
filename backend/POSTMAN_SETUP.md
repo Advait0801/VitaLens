@@ -107,6 +107,12 @@ if (pm.response.code === 200) {
     const response = pm.response.json();
     pm.collectionVariables.set('access_token', response.access_token);
     pm.collectionVariables.set('refresh_token', response.refresh_token);
+    
+    // Decode JWT to get user_id
+    const token = response.access_token;
+    const payload = token.split('.')[1];
+    const decoded = JSON.parse(atob(payload));
+    pm.collectionVariables.set('user_id', decoded.sub);
 }
 ```
 

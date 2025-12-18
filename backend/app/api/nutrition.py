@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional, Dict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from app.core.database import get_db
 from app.core.security import get_current_active_user
@@ -28,9 +28,9 @@ async def get_daily_nutrition(
 ):
     """Get daily nutrition summary for a specific date"""
     if not target_date:
-        target_date = date.today()
+        target_date = datetime.utcnow().date()
     
-    # Get all meals for the date
+    # Get all meals for the date (timezone-naive to match DB column)
     start_datetime = datetime.combine(target_date, datetime.min.time())
     end_datetime = datetime.combine(target_date, datetime.max.time())
     

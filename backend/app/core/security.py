@@ -18,7 +18,7 @@ from app.schemas.auth import TokenData
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_PREFIX}/auth/login")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -66,14 +66,15 @@ async def get_current_user(
     
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        user_id: int = payload.get("sub")
+        user_id_str = payload.get("sub")
         token_type: str = payload.get("type")
         
-        if user_id is None or token_type != "access":
+        if user_id_str is None or token_type != "access":
             raise credentials_exception
         
+        user_id = int(user_id_str)
         token_data = TokenData(user_id=user_id)
-    except JWTError:
+    except (JWTError, ValueError):
         raise credentials_exception
     
     from sqlalchemy import select

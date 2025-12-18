@@ -23,7 +23,48 @@ class NutritionService:
             "calories": 165, "protein": 31, "carbs": 0, "fiber": 0,
             "fat": 3.6, "unit": "per_100g"
         },
-        # Add more foods as needed
+        "chicken": {
+            "calories": 165, "protein": 31, "carbs": 0, "fiber": 0,
+            "fat": 3.6, "unit": "per_100g"
+        },
+        "rice": {
+            "calories": 130, "protein": 2.7, "carbs": 28, "fiber": 0.4,
+            "fat": 0.3, "unit": "per_100g"
+        },
+        "egg": {
+            "calories": 155, "protein": 13, "carbs": 1.1, "fiber": 0,
+            "fat": 11, "unit": "per_100g"
+        },
+        "bread": {
+            "calories": 265, "protein": 9, "carbs": 49, "fiber": 2.7,
+            "fat": 3.2, "unit": "per_100g"
+        },
+        "milk": {
+            "calories": 42, "protein": 3.4, "carbs": 5, "fiber": 0,
+            "fat": 1, "unit": "per_100g"
+        },
+        "salad": {
+            "calories": 20, "protein": 1.5, "carbs": 3.5, "fiber": 2,
+            "fat": 0.2, "vitamin_c": 15, "unit": "per_100g"
+        },
+        "fish": {
+            "calories": 136, "protein": 20, "carbs": 0, "fiber": 0,
+            "fat": 5.9, "unit": "per_100g"
+        },
+        "beef": {
+            "calories": 250, "protein": 26, "carbs": 0, "fiber": 0,
+            "fat": 15, "iron": 2.6, "unit": "per_100g"
+        },
+        "pasta": {
+            "calories": 131, "protein": 5, "carbs": 25, "fiber": 1.8,
+            "fat": 1.1, "unit": "per_100g"
+        },
+    }
+    
+    # Default nutrition for unknown foods (average meal estimate)
+    DEFAULT_NUTRITION = {
+        "calories": 150, "protein": 8, "carbs": 20, "fiber": 2,
+        "fat": 5, "unit": "per_100g"
     }
     
     def normalize_food_name(self, food_name: str) -> str:
@@ -47,8 +88,8 @@ class NutritionService:
                     break
         
         if not base_nutrition:
-            # Return empty nutrition if not found
-            return {}
+            # Use default estimated nutrition for unknown foods
+            base_nutrition = self.DEFAULT_NUTRITION
         
         # Calculate nutrients based on quantity
         multiplier = quantity / 100.0  # Assuming base is per 100g

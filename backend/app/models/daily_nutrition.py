@@ -18,8 +18,8 @@ class DailyNutrition(Base):
     nutrient_name = Column(String, nullable=False, index=True)  # e.g., "calories", "protein"
     total_value = Column(Float, nullable=False)  # Total for the day
     unit = Column(String, nullable=False)  # e.g., "kcal", "g", "mg"
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Unique constraint: one record per user per date per nutrient
     __table_args__ = (

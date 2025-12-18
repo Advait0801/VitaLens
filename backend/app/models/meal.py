@@ -38,8 +38,8 @@ class Meal(Base):
     raw_text = Column(Text, nullable=True)  # OCR extracted text
     notes = Column(Text, nullable=True)
     meal_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     user = relationship("User", back_populates="meals")

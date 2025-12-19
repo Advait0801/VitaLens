@@ -1,5 +1,5 @@
 """
-Nutrition service for mapping foods to nutrition data using USDA and Open Food Facts APIs
+Nutrition service for mapping foods to nutrition data using USDA FoodData Central API
 """
 import asyncio
 from typing import List, Dict, Optional
@@ -10,10 +10,9 @@ from app.core.config import settings
 
 
 class NutritionService:
-    """Service for nutrition data mapping and calculations using external APIs"""
+    """Service for nutrition data mapping and calculations using USDA FoodData Central API"""
     
-    # API endpoints
-    OPEN_FOOD_FACTS_API = "https://world.openfoodfacts.org/api/v0/product"
+    # API endpoint
     USDA_API_BASE = "https://api.nal.usda.gov/fdc/v1"
     
     # Default nutrition for unknown foods (average meal estimate)
@@ -25,7 +24,7 @@ class NutritionService:
     def __init__(self):
         """Initialize the nutrition service"""
         self._http_client: Optional[httpx.AsyncClient] = None
-        self.usda_api_key = getattr(settings, 'USDA_API_KEY', None)
+        self.usda_api_key = settings.USDA_API_KEY
     
     @property
     def http_client(self) -> httpx.AsyncClient:
@@ -37,69 +36,6 @@ class NutritionService:
     def normalize_food_name(self, food_name: str) -> str:
         """Normalize food name for database lookup"""
         return food_name.lower().strip()
-    
-    async def get_nutrition_from_openfoodfacts(self, barcode: str) -> Optional[Dict[str, float]]:
-        """
-        Get nutrition data from Open Food Facts API using barcode.
-        Returns nutrition data per 100g or None if not found.
-        """
-        try:
-            url = f"{self.OPEN_FOOD_FACTS_API}/{barcode}.json"
-            response = await self.http_client.get(url)
-            response.raise_for_status()
-            data = response.json()
-            
-            if data.get("status") != 1:  # Status 1 means product found
-                return None
-            
-            product = data.get("product", {})
-            nutriments = product.get("nutriments", {})
-            
-            if not nutriments:
-                return None
-            
-            # Map Open Food Facts nutrients to our format (values are per 100g)
-            nutrition = {}
-            
-            # Energy (kcal)
-            if "energy-kcal_100g" in nutriments:
-                nutrition["calories"] = nutriments["energy-kcal_100g"]
-            elif "energy_100g" in nutriments:
-                # Convert kJ to kcal (1 kcal = 4.184 kJ)
-                nutrition["calories"] = nutriments["energy_100g"] / 4.184
-            
-            # Macronutrients (already per 100g)
-            if "proteins_100g" in nutriments:
-                nutrition["protein"] = nutriments["proteins_100g"]
-            if "carbohydrates_100g" in nutriments:
-                nutrition["carbs"] = nutriments["carbohydrates_100g"]
-            if "fiber_100g" in nutriments:
-                nutrition["fiber"] = nutriments["fiber_100g"]
-            if "fat_100g" in nutriments:
-                nutrition["fat"] = nutriments["fat_100g"]
-            if "saturated-fat_100g" in nutriments:
-                nutrition["saturated_fat"] = nutriments["saturated-fat_100g"]
-            
-            # Micronutrients (in mg per 100g)
-            if "sodium_100g" in nutriments:
-                # Convert from g to mg
-                nutrition["sodium"] = nutriments["sodium_100g"] * 1000
-            if "vitamin-c_100g" in nutriments:
-                nutrition["vitamin_c"] = nutriments["vitamin-c_100g"]
-            if "calcium_100g" in nutriments:
-                nutrition["calcium"] = nutriments["calcium_100g"] * 1000  # g to mg
-            if "iron_100g" in nutriments:
-                nutrition["iron"] = nutriments["iron_100g"] * 1000  # g to mg
-            if "potassium_100g" in nutriments:
-                nutrition["potassium"] = nutriments["potassium_100g"] * 1000  # g to mg
-            
-            nutrition["unit"] = "per_100g"
-            return nutrition if nutrition else None
-            
-        except Exception as e:
-            # Log error but don't raise - fall back to other sources
-            print(f"Error fetching from Open Food Facts: {e}")
-            return None
     
     async def get_nutrition_from_usda(self, food_name: str) -> Optional[Dict[str, float]]:
         """
@@ -195,21 +131,20 @@ class NutritionService:
         barcode: Optional[str] = None
     ) -> Dict[str, float]:
         """
-        Get nutrition data for a food item asynchronously.
-        Tries Open Food Facts (if barcode provided), then USDA, then defaults.
+        Get nutrition data for a food item asynchronously using USDA FoodData Central API.
+        Falls back to defaults if API fails or no data found.
         Returns nutrients per specified quantity.
+        
+        Args:
+            food_name: Name of the food item
+            quantity: Quantity in the specified unit (default: 100)
+            unit: Unit of measurement (default: "g")
+            barcode: Optional barcode (not used, kept for API compatibility)
         """
-        base_nutrition = None
+        # Try USDA API
+        base_nutrition = await self.get_nutrition_from_usda(food_name)
         
-        # Try Open Food Facts first if barcode is available
-        if barcode:
-            base_nutrition = await self.get_nutrition_from_openfoodfacts(barcode)
-        
-        # Try USDA API if Open Food Facts didn't work
-        if not base_nutrition:
-            base_nutrition = await self.get_nutrition_from_usda(food_name)
-        
-        # Fall back to default if APIs failed
+        # Fall back to default if USDA API failed or no data found
         if not base_nutrition:
             base_nutrition = self.DEFAULT_NUTRITION.copy()
         
@@ -232,6 +167,7 @@ class NutritionService:
     ) -> Dict[str, float]:
         """
         Get nutrition data for a food item (synchronous wrapper).
+        Uses USDA FoodData Central API.
         For async contexts, use get_nutrition_data_async instead.
         """
         # Create event loop if none exists (for sync calls)

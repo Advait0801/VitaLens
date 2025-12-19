@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     OCR_ENGINE: str = "easyocr"
     
     # Nutrition API Configuration
-    USDA_API_KEY: Optional[str] = None  # Optional - improves rate limits
+    USDA_API_KEY: Optional[str] = None  # Required for USDA FoodData Central API (get free key at https://fdc.nal.usda.gov/api-guide.html)
     
     @property
     def database_url(self) -> str:

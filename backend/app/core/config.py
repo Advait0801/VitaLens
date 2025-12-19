@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # OCR Configuration
     OCR_ENGINE: str = "easyocr"
     
+    # Nutrition API Configuration
+    USDA_API_KEY: Optional[str] = None  # Optional - improves rate limits
+    
     @property
     def database_url(self) -> str:
         """

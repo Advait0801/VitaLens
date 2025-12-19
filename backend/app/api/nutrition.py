@@ -1,11 +1,11 @@
 """
 Nutrition and health insights routes
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
-from typing import List, Optional, Dict
+from typing import Optional
 from datetime import date, datetime, timedelta, timezone
 
 from app.core.database import get_db
@@ -13,8 +13,6 @@ from app.core.security import get_current_active_user
 from app.models.user import User
 from app.models.meal import Meal
 from app.models.food_item import FoodItem
-from app.models.nutrient import Nutrient
-from app.models.daily_nutrition import DailyNutrition
 from app.services.llm_service import llm_service
 
 router = APIRouter(prefix="/nutrition", tags=["Nutrition"])
@@ -28,7 +26,7 @@ async def get_daily_nutrition(
 ):
     """Get daily nutrition summary for a specific date"""
     if not target_date:
-        target_date = datetime.utcnow().date()
+        target_date = datetime.now(timezone.utc).date()
     
     # Get all meals for the date (timezone-naive to match DB column)
     start_datetime = datetime.combine(target_date, datetime.min.time())

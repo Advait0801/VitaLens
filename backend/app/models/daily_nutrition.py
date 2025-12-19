@@ -3,7 +3,6 @@ Daily nutrition aggregation model
 """
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, DateTime, Index
-from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 

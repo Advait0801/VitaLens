@@ -3,7 +3,7 @@ Meal routes
 """
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, date
@@ -135,11 +135,12 @@ async def upload_meal(
             db.add(food_item)
             await db.flush()
             
-            # Get nutrition data from our database
-            nutrition_data = nutrition_service.get_nutrition_data(
+            # Get nutrition data from APIs (Open Food Facts or USDA)
+            nutrition_data = await nutrition_service.get_nutrition_data_async(
                 food_item.normalized_name or food_item.name,
                 food_item.quantity or 100,
-                food_item.unit or "g"
+                food_item.unit or "g",
+                barcode=food_item.barcode
             )
             
             # Create nutrient objects
@@ -198,11 +199,12 @@ async def create_meal(
         db.add(food_item)
         await db.flush()
         
-        # Get nutrition data
-        nutrition_data = nutrition_service.get_nutrition_data(
+        # Get nutrition data from APIs (Open Food Facts or USDA)
+        nutrition_data = await nutrition_service.get_nutrition_data_async(
             food_item.name,
             food_item.quantity or 100,
-            food_item.unit or "g"
+            food_item.unit or "g",
+            barcode=food_item.barcode
         )
         
         # Create nutrient objects

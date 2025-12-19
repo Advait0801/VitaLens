@@ -2,7 +2,7 @@
 LLM service for food normalization and health insights
 """
 import httpx
-from typing import List, Dict, Optional
+from typing import Dict
 from app.core.config import settings
 
 

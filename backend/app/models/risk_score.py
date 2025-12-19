@@ -3,7 +3,6 @@ Risk score model
 """
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, Enum as SQLEnum
-from sqlalchemy.orm import relationship
 import enum
 
 from app.core.database import Base

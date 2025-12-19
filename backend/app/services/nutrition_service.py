@@ -25,6 +25,8 @@ class NutritionService:
         """Initialize the nutrition service"""
         self._http_client: Optional[httpx.AsyncClient] = None
         self.usda_api_key = settings.USDA_API_KEY
+        # Cache for nutrition data (key: normalized food name, value: nutrition dict per 100g)
+        self._nutrition_cache: Dict[str, Dict[str, float]] = {}
     
     @property
     def http_client(self) -> httpx.AsyncClient:
@@ -42,10 +44,16 @@ class NutritionService:
         Get nutrition data from USDA FoodData Central API using food name.
         Returns nutrition data per 100g or None if not found.
         Requires API key (get one free at https://fdc.nal.usda.gov/api-guide.html)
+        Uses caching to avoid repeated API calls for the same food.
         """
         if not self.usda_api_key:
             # USDA API requires an API key
             return None
+        
+        # Check cache first
+        normalized_name = self.normalize_food_name(food_name)
+        if normalized_name in self._nutrition_cache:
+            return self._nutrition_cache[normalized_name].copy()
         
         try:
             # Search for food
@@ -83,18 +91,59 @@ class NutritionService:
             nutrition = {}
             food_nutrients = food_data.get("foodNutrients", [])
             
-            # Map USDA nutrient IDs to our nutrient names (common nutrients)
+            # Map USDA nutrient IDs to our nutrient names (comprehensive mapping)
             nutrient_map = {
-                1008: "calories",  # Energy (kcal)
-                1003: "protein",   # Protein
-                1005: "carbs",     # Carbohydrate, by difference
-                1079: "fiber",     # Fiber, total dietary
-                1004: "fat",       # Total lipid (fat)
-                1253: "sodium",    # Sodium, Na (mg)
-                1162: "vitamin_c", # Vitamin C, total ascorbic acid (mg)
-                1087: "calcium",   # Calcium, Ca (mg)
-                1089: "iron",      # Iron, Fe (mg)
-                1092: "potassium", # Potassium, K (mg)
+                # Energy & Macronutrients
+                1008: "calories",        # Energy (kcal)
+                1062: "energy_kj",       # Energy (kJ) - for fallback
+                1003: "protein",         # Protein (g)
+                1005: "carbs",           # Carbohydrate, by difference (g)
+                1079: "fiber",           # Fiber, total dietary (g)
+                1004: "fat",             # Total lipid (fat) (g)
+                1258: "saturated_fat",   # Fatty acids, total saturated (g)
+                1257: "monounsaturated_fat",  # Fatty acids, total monounsaturated (g)
+                1256: "polyunsaturated_fat",  # Fatty acids, total polyunsaturated (g)
+                
+                # Minerals
+                1093: "sodium",          # Sodium, Na (mg)
+                1092: "potassium",       # Potassium, K (mg)
+                1087: "calcium",         # Calcium, Ca (mg)
+                1089: "iron",            # Iron, Fe (mg)
+                1090: "magnesium",       # Magnesium, Mg (mg)
+                1091: "phosphorus",      # Phosphorus, P (mg)
+                1095: "zinc",            # Zinc, Zn (mg)
+                1098: "copper",          # Copper, Cu (mg)
+                1101: "manganese",       # Manganese, Mn (mg)
+                1103: "selenium",        # Selenium, Se (µg)
+                1094: "iodine",          # Iodine, I (µg)
+                
+                # Vitamins - Fat Soluble
+                1106: "vitamin_a",       # Vitamin A, RAE (µg)
+                1114: "vitamin_d",       # Vitamin D (D2 + D3) (µg)
+                1109: "vitamin_e",       # Vitamin E (alpha-tocopherol) (mg)
+                1185: "vitamin_k",       # Vitamin K (phylloquinone) (µg)
+                
+                # Vitamins - Water Soluble
+                1162: "vitamin_c",       # Vitamin C, total ascorbic acid (mg)
+                1165: "thiamin",         # Thiamin (B1) (mg)
+                1166: "riboflavin",      # Riboflavin (B2) (mg)
+                1167: "niacin",          # Niacin (B3) (mg)
+                1175: "vitamin_b6",      # Vitamin B-6 (mg)
+                1177: "folate",          # Folate, total (µg)
+                1178: "vitamin_b12",     # Vitamin B-12 (µg)
+                1170: "pantothenic_acid", # Pantothenic acid (B5) (mg)
+                1176: "biotin",          # Biotin (µg)
+                1180: "choline",         # Choline, total (mg)
+                
+                # Other important nutrients
+                1051: "water",           # Water (g)
+                1001: "ash",             # Ash (g)
+                2000: "sugars",          # Sugars, total including NLEA (g)
+                1235: "sucrose",         # Sucrose (g)
+                1236: "glucose",         # Glucose (dextrose) (g)
+                1237: "fructose",        # Fructose (g)
+                1238: "lactose",         # Lactose (g)
+                1242: "starch",          # Starch (g)
             }
             
             for fn in food_nutrients:
@@ -116,12 +165,26 @@ class NutritionService:
                             break
             
             nutrition["unit"] = "per_100g"
-            return nutrition if nutrition else None
+            
+            # Cache the result if we got valid nutrition data
+            if nutrition:
+                self._nutrition_cache[normalized_name] = nutrition.copy()
+                return nutrition
+            
+            return None
             
         except Exception as e:
             # Log error but don't raise - fall back to defaults
             print(f"Error fetching from USDA API: {e}")
             return None
+    
+    def clear_cache(self):
+        """Clear the nutrition data cache"""
+        self._nutrition_cache.clear()
+    
+    def get_cache_size(self) -> int:
+        """Get the number of items in the cache"""
+        return len(self._nutrition_cache)
     
     async def get_nutrition_data_async(
         self, 
@@ -197,17 +260,55 @@ class NutritionService:
     
     # Map nutrient names to standard units
     nutrient_units = {
+        # Energy & Macronutrients
         "calories": "kcal",
+        "energy_kj": "kJ",
         "protein": "g",
         "carbs": "g",
         "fiber": "g",
         "fat": "g",
         "saturated_fat": "g",
-        "vitamin_c": "mg",
-        "potassium": "mg",
+        "monounsaturated_fat": "g",
+        "polyunsaturated_fat": "g",
+        "water": "g",
+        "ash": "g",
+        "sugars": "g",
+        "sucrose": "g",
+        "glucose": "g",
+        "fructose": "g",
+        "lactose": "g",
+        "starch": "g",
+        
+        # Minerals
         "sodium": "mg",
+        "potassium": "mg",
         "calcium": "mg",
         "iron": "mg",
+        "magnesium": "mg",
+        "phosphorus": "mg",
+        "zinc": "mg",
+        "copper": "mg",
+        "manganese": "mg",
+        "selenium": "µg",
+        "iodine": "µg",
+        
+        # Vitamins - Fat Soluble
+        "vitamin_a": "µg",
+        "vitamin_d": "µg",
+        "vitamin_e": "mg",
+        "vitamin_k": "µg",
+        
+        # Vitamins - Water Soluble
+        "vitamin_c": "mg",
+        "thiamin": "mg",
+        "riboflavin": "mg",
+        "niacin": "mg",
+        "vitamin_b6": "mg",
+        "folate": "µg",
+        "vitamin_b12": "µg",
+        "pantothenic_acid": "mg",
+        "biotin": "µg",
+        "choline": "mg",
     }
     
     def create_nutrient_objects(

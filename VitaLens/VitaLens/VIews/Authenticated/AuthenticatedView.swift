@@ -9,6 +9,7 @@ import SwiftUI
 
 struct AuthenticatedView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     
     var body: some View {
         TabView {
@@ -37,6 +38,7 @@ struct AuthenticatedView: View {
                     Label("Profile", systemImage: "person.fill")
                 }
         }
-        .tint(.blue)
+        .tint(Colors.primary)
+        .background(Colors.background)
     }
 }

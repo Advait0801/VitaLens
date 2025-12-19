@@ -8,15 +8,29 @@
 import SwiftUI
 
 struct HealthInsightsView: View {
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    
     var body: some View {
         NavigationStack {
-            VStack {
-                Text("Health Insights")
-                    .font(.title)
-                
-                Text("To be implemented")
+            GeometryReader { geometry in
+                ScrollView {
+                    VStack(spacing: LayoutHelper.adaptiveSpacing(horizontalSizeClass)) {
+                        Text("Health Insights")
+                            .font(.system(size: LayoutHelper.isIPad(horizontalSizeClass) ? 36 : 28, weight: .semibold))
+                            .foregroundColor(Colors.textPrimary)
+                            .padding(.top, LayoutHelper.adaptivePadding(horizontalSizeClass))
+                        
+                        Text("To be implemented")
+                            .font(.body)
+                            .foregroundColor(Colors.textSecondary)
+                    }
+                    .frame(maxWidth: LayoutHelper.maxContentWidth(geometry, horizontalSizeClass))
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, LayoutHelper.adaptivePadding(horizontalSizeClass))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Colors.background)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle("Insights")
         }
     }

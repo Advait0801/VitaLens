@@ -20,6 +20,7 @@ struct RootView: View {
                     .environmentObject(authViewModel)
             }
         }
+        .background(Colors.background)
         .animation(.easeInOut, value: authViewModel.isAuthenticated)
     }
 }

@@ -13,6 +13,10 @@ struct RegisterView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @StateObject private var viewModel = RegisterViewModel()
     @FocusState private var focusedField: Field?
+    @State private var showPassword: Bool = false
+    @State private var showConfirmPassword: Bool = false
+    @State private var showAlert: Bool = false
+    @State private var alertMessage: String = ""
     
     enum Field {
         case email
@@ -54,7 +58,12 @@ struct RegisterView: View {
                                 .focused($focusedField, equals: .email)
                                 .submitLabel(.next)
                                 .onSubmit {
-                                    focusedField = .username
+                                    if let error = viewModel.validateField(.email) {
+                                        alertMessage = error
+                                        showAlert = true
+                                    } else {
+                                        focusedField = .username
+                                    }
                                 }
                         }
                         
@@ -72,7 +81,12 @@ struct RegisterView: View {
                                 .focused($focusedField, equals: .username)
                                 .submitLabel(.next)
                                 .onSubmit {
-                                    focusedField = .password
+                                    if let error = viewModel.validateField(.username) {
+                                        alertMessage = error
+                                        showAlert = true
+                                    } else {
+                                        focusedField = .password
+                                    }
                                 }
                         }
                         
@@ -82,14 +96,43 @@ struct RegisterView: View {
                                 .font(.subheadline)
                                 .foregroundColor(Colors.textSecondary)
                             
-                            SecureField("Enter password", text: $viewModel.password)
-                                .textFieldStyle(CustomTextFieldStyle())
-                                .textContentType(.newPassword)
+                            HStack {
+                                Group {
+                                    if showPassword {
+                                        TextField("Enter password", text: $viewModel.password)
+                                            .textContentType(.newPassword)
+                                            .autocapitalization(.none)
+                                    } else {
+                                        SecureField("Enter password", text: $viewModel.password)
+                                            .textContentType(.newPassword)
+                                    }
+                                }
                                 .focused($focusedField, equals: .password)
-                                .submitLabel(.next)
-                                .onSubmit {
+                                
+                                Button(action: {
+                                    showPassword.toggle()
+                                }) {
+                                    Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                        .foregroundColor(Colors.textSecondary)
+                                }
+                            }
+                            .padding()
+                            .background(Colors.surface)
+                            .foregroundColor(Colors.textPrimary)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Colors.textSecondary.opacity(0.3), lineWidth: 1)
+                            )
+                            .submitLabel(.next)
+                            .onSubmit {
+                                if let error = viewModel.validateField(.password) {
+                                    alertMessage = error
+                                    showAlert = true
+                                } else {
                                     focusedField = .confirmPassword
                                 }
+                            }
                         }
                         
                         // Confirm Password Field
@@ -98,16 +141,46 @@ struct RegisterView: View {
                                 .font(.subheadline)
                                 .foregroundColor(Colors.textSecondary)
                             
-                            SecureField("Confirm password", text: $viewModel.confirmPassword)
-                                .textFieldStyle(CustomTextFieldStyle())
-                                .textContentType(.newPassword)
+                            HStack {
+                                Group {
+                                    if showConfirmPassword {
+                                        TextField("Confirm password", text: $viewModel.confirmPassword)
+                                            .textContentType(.newPassword)
+                                            .autocapitalization(.none)
+                                    } else {
+                                        SecureField("Confirm password", text: $viewModel.confirmPassword)
+                                            .textContentType(.newPassword)
+                                    }
+                                }
                                 .focused($focusedField, equals: .confirmPassword)
-                                .submitLabel(.go)
-                                .onSubmit {
+                                
+                                Button(action: {
+                                    showConfirmPassword.toggle()
+                                }) {
+                                    Image(systemName: showConfirmPassword ? "eye.slash.fill" : "eye.fill")
+                                        .foregroundColor(Colors.textSecondary)
+                                }
+                            }
+                            .padding()
+                            .background(Colors.surface)
+                            .foregroundColor(Colors.textPrimary)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Colors.textSecondary.opacity(0.3), lineWidth: 1)
+                            )
+                            .submitLabel(.go)
+                            .onSubmit {
+                                if let error = viewModel.validateField(.confirmPassword) {
+                                    alertMessage = error
+                                    showAlert = true
+                                } else {
+                                    focusedField = nil
                                     Task {
                                         await viewModel.register()
                                     }
                                 }
+                            }
                         }
                     }
                     .frame(maxWidth: LayoutHelper.isIPad(horizontalSizeClass) ? 400 : .infinity)
@@ -125,8 +198,23 @@ struct RegisterView: View {
                     
                     // Register Button
                     Button(action: {
-                        Task {
-                            await viewModel.register()
+                        focusedField = nil
+                        if let error = viewModel.validateField(.email) {
+                            alertMessage = error
+                            showAlert = true
+                        } else if let error = viewModel.validateField(.username) {
+                            alertMessage = error
+                            showAlert = true
+                        } else if let error = viewModel.validateField(.password) {
+                            alertMessage = error
+                            showAlert = true
+                        } else if let error = viewModel.validateField(.confirmPassword) {
+                            alertMessage = error
+                            showAlert = true
+                        } else {
+                            Task {
+                                await viewModel.register()
+                            }
                         }
                     }) {
                         HStack {
@@ -165,6 +253,14 @@ struct RegisterView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Colors.background)
+            .onTapGesture {
+                focusedField = nil
+            }
+            .alert("Validation Error", isPresented: $showAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(alertMessage)
+            }
         }
     }
 }

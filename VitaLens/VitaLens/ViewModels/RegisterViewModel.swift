@@ -5,7 +5,6 @@
 //  Created by Advait Naik on 12/19/25.
 //
 
-import Foundation
 import SwiftUI
 internal import Combine
 
@@ -22,63 +21,80 @@ class RegisterViewModel: ObservableObject {
     private let authService = AuthService.shared
     private let keychainService = KeychainService.shared
     
-    /// Validate registration form
+    /// Validate registration form field by field
+    func validateField(_ field: ValidationField) -> String? {
+        switch field {
+        case .email:
+            if email.trimmingCharacters(in: .whitespaces).isEmpty {
+                return "Email is required"
+            }
+            if !isValidEmail(email) {
+                return "Please enter a valid email address"
+            }
+            return nil
+        case .username:
+            if username.trimmingCharacters(in: .whitespaces).isEmpty {
+                return "Username is required"
+            }
+            if username.count < 3 {
+                return "Username must be at least 3 characters"
+            }
+            return nil
+        case .password:
+            if password.isEmpty {
+                return "Password is required"
+            }
+            if password.count < 6 {
+                return "Password must be at least 6 characters"
+            }
+            return nil
+        case .confirmPassword:
+            if confirmPassword.isEmpty {
+                return "Please confirm your password"
+            }
+            if password != confirmPassword {
+                return "Passwords do not match"
+            }
+            return nil
+        }
+    }
+    
+    /// Validate all fields
     func validate() -> Bool {
         errorMessage = nil
         
-        // Email validation
-        if email.trimmingCharacters(in: .whitespaces).isEmpty {
-            errorMessage = "Email is required"
+        if let error = validateField(.email) {
+            errorMessage = error
             showError = true
             return false
         }
         
-        if !isValidEmail(email) {
-            errorMessage = "Please enter a valid email address"
+        if let error = validateField(.username) {
+            errorMessage = error
             showError = true
             return false
         }
         
-        // Username validation
-        if username.trimmingCharacters(in: .whitespaces).isEmpty {
-            errorMessage = "Username is required"
+        if let error = validateField(.password) {
+            errorMessage = error
             showError = true
             return false
         }
         
-        if username.count < 3 {
-            errorMessage = "Username must be at least 3 characters"
-            showError = true
-            return false
-        }
-        
-        // Password validation
-        if password.isEmpty {
-            errorMessage = "Password is required"
-            showError = true
-            return false
-        }
-        
-        if password.count < 6 {
-            errorMessage = "Password must be at least 6 characters"
-            showError = true
-            return false
-        }
-        
-        // Confirm password validation
-        if confirmPassword.isEmpty {
-            errorMessage = "Please confirm your password"
-            showError = true
-            return false
-        }
-        
-        if password != confirmPassword {
-            errorMessage = "Passwords do not match"
+        if let error = validateField(.confirmPassword) {
+            errorMessage = error
             showError = true
             return false
         }
         
         return true
+    }
+    
+    enum ValidationField {
+        case email
+        case username
+        case password
+        case confirmPassword
     }
     
     /// Perform registration

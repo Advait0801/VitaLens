@@ -13,6 +13,9 @@ struct LoginView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @StateObject private var viewModel = LoginViewModel()
     @FocusState private var focusedField: Field?
+    @State private var showPassword: Bool = false
+    @State private var showAlert: Bool = false
+    @State private var alertMessage: String = ""
     
     enum Field {
         case usernameOrEmail
@@ -51,7 +54,12 @@ struct LoginView: View {
                                 .focused($focusedField, equals: .usernameOrEmail)
                                 .submitLabel(.next)
                                 .onSubmit {
-                                    focusedField = .password
+                                    if let error = viewModel.validateField(.usernameOrEmail) {
+                                        alertMessage = error
+                                        showAlert = true
+                                    } else {
+                                        focusedField = .password
+                                    }
                                 }
                         }
                         
@@ -61,16 +69,46 @@ struct LoginView: View {
                                 .font(.subheadline)
                                 .foregroundColor(Colors.textSecondary)
                             
-                            SecureField("Enter password", text: $viewModel.password)
-                                .textFieldStyle(CustomTextFieldStyle())
-                                .textContentType(.password)
+                            HStack {
+                                Group {
+                                    if showPassword {
+                                        TextField("Enter password", text: $viewModel.password)
+                                            .textContentType(.password)
+                                            .autocapitalization(.none)
+                                    } else {
+                                        SecureField("Enter password", text: $viewModel.password)
+                                            .textContentType(.password)
+                                    }
+                                }
                                 .focused($focusedField, equals: .password)
-                                .submitLabel(.go)
-                                .onSubmit {
+                                
+                                Button(action: {
+                                    showPassword.toggle()
+                                }) {
+                                    Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                        .foregroundColor(Colors.textSecondary)
+                                }
+                            }
+                            .padding()
+                            .background(Colors.surface)
+                            .foregroundColor(Colors.textPrimary)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Colors.textSecondary.opacity(0.3), lineWidth: 1)
+                            )
+                            .submitLabel(.go)
+                            .onSubmit {
+                                if let error = viewModel.validateField(.password) {
+                                    alertMessage = error
+                                    showAlert = true
+                                } else {
+                                    focusedField = nil
                                     Task {
                                         await viewModel.login()
                                     }
                                 }
+                            }
                         }
                     }
                     .frame(maxWidth: LayoutHelper.isIPad(horizontalSizeClass) ? 400 : .infinity)
@@ -88,8 +126,17 @@ struct LoginView: View {
                     
                     // Login Button
                     Button(action: {
-                        Task {
-                            await viewModel.login()
+                        focusedField = nil
+                        if let error = viewModel.validateField(.usernameOrEmail) {
+                            alertMessage = error
+                            showAlert = true
+                        } else if let error = viewModel.validateField(.password) {
+                            alertMessage = error
+                            showAlert = true
+                        } else {
+                            Task {
+                                await viewModel.login()
+                            }
                         }
                     }) {
                         HStack {
@@ -128,6 +175,14 @@ struct LoginView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Colors.background)
+            .onTapGesture {
+                focusedField = nil
+            }
+            .alert("Validation Error", isPresented: $showAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(alertMessage)
+            }
         }
     }
 }

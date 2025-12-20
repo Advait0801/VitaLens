@@ -5,7 +5,6 @@
 //  Created by Advait Naik on 12/19/25.
 //
 
-import Foundation
 import SwiftUI
 internal import Combine
 
@@ -20,29 +19,47 @@ class LoginViewModel: ObservableObject {
     private let authService = AuthService.shared
     private let keychainService = KeychainService.shared
     
-    /// Validate login form
+    /// Validate login form field by field
+    func validateField(_ field: ValidationField) -> String? {
+        switch field {
+        case .usernameOrEmail:
+            if usernameOrEmail.trimmingCharacters(in: .whitespaces).isEmpty {
+                return "Username or email is required"
+            }
+            return nil
+        case .password:
+            if password.isEmpty {
+                return "Password is required"
+            }
+            if password.count < 6 {
+                return "Password must be at least 6 characters"
+            }
+            return nil
+        }
+    }
+    
+    /// Validate all fields
     func validate() -> Bool {
         errorMessage = nil
         
-        if usernameOrEmail.trimmingCharacters(in: .whitespaces).isEmpty {
-            errorMessage = "Username or email is required"
+        if let error = validateField(.usernameOrEmail) {
+            errorMessage = error
             showError = true
             return false
         }
         
-        if password.isEmpty {
-            errorMessage = "Password is required"
-            showError = true
-            return false
-        }
-        
-        if password.count < 6 {
-            errorMessage = "Password must be at least 6 characters"
+        if let error = validateField(.password) {
+            errorMessage = error
             showError = true
             return false
         }
         
         return true
+    }
+    
+    enum ValidationField {
+        case usernameOrEmail
+        case password
     }
     
     /// Perform login

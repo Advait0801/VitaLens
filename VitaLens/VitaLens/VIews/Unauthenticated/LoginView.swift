@@ -11,11 +11,19 @@ struct LoginView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @Binding var showingLogin: Bool
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    @StateObject private var viewModel = LoginViewModel()
+    @FocusState private var focusedField: Field?
+    
+    enum Field {
+        case usernameOrEmail
+        case password
+    }
     
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: LayoutHelper.adaptiveSpacing(horizontalSizeClass)) {
+                    // Header
                     Text("VitaLens")
                         .font(.system(size: LayoutHelper.isIPad(horizontalSizeClass) ? 48 : 34, weight: .bold))
                         .foregroundColor(Colors.primary)
@@ -27,13 +35,83 @@ struct LoginView: View {
                     
                     Spacer(minLength: LayoutHelper.adaptiveSpacing(horizontalSizeClass, base: 40))
                     
-                    Text("Login View - To be implemented")
-                        .font(.body)
-                        .foregroundColor(Colors.textSecondary)
-                        .multilineTextAlignment(.center)
+                    // Form Fields
+                    VStack(spacing: LayoutHelper.adaptiveSpacing(horizontalSizeClass, base: 16)) {
+                        // Username/Email Field
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Username or Email")
+                                .font(.subheadline)
+                                .foregroundColor(Colors.textSecondary)
+                            
+                            TextField("Enter username or email", text: $viewModel.usernameOrEmail)
+                                .textFieldStyle(CustomTextFieldStyle())
+                                .textContentType(.username)
+                                .autocapitalization(.none)
+                                .autocorrectionDisabled()
+                                .focused($focusedField, equals: .usernameOrEmail)
+                                .submitLabel(.next)
+                                .onSubmit {
+                                    focusedField = .password
+                                }
+                        }
+                        
+                        // Password Field
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Password")
+                                .font(.subheadline)
+                                .foregroundColor(Colors.textSecondary)
+                            
+                            SecureField("Enter password", text: $viewModel.password)
+                                .textFieldStyle(CustomTextFieldStyle())
+                                .textContentType(.password)
+                                .focused($focusedField, equals: .password)
+                                .submitLabel(.go)
+                                .onSubmit {
+                                    Task {
+                                        await viewModel.login()
+                                    }
+                                }
+                        }
+                    }
+                    .frame(maxWidth: LayoutHelper.isIPad(horizontalSizeClass) ? 400 : .infinity)
                     
-                    Spacer(minLength: LayoutHelper.adaptiveSpacing(horizontalSizeClass, base: 40))
+                    // Error Message
+                    if viewModel.showError, let errorMessage = viewModel.errorMessage {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundColor(Colors.error)
+                            .padding(.horizontal)
+                            .multilineTextAlignment(.center)
+                    }
                     
+                    Spacer(minLength: LayoutHelper.adaptiveSpacing(horizontalSizeClass, base: 20))
+                    
+                    // Login Button
+                    Button(action: {
+                        Task {
+                            await viewModel.login()
+                        }
+                    }) {
+                        HStack {
+                            if viewModel.isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Text("Login")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Colors.primary)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                    }
+                    .disabled(viewModel.isLoading)
+                    .frame(maxWidth: LayoutHelper.isIPad(horizontalSizeClass) ? 400 : .infinity)
+                    
+                    // Register Link
                     Button(action: {
                         showingLogin = false
                     }) {
@@ -41,6 +119,7 @@ struct LoginView: View {
                             .font(.body)
                             .foregroundColor(Colors.primary)
                     }
+                    .padding(.top, LayoutHelper.adaptiveSpacing(horizontalSizeClass, base: 8))
                     .padding(.bottom, LayoutHelper.adaptivePadding(horizontalSizeClass))
                 }
                 .frame(maxWidth: LayoutHelper.maxContentWidth(geometry, horizontalSizeClass))
@@ -50,5 +129,20 @@ struct LoginView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Colors.background)
         }
+    }
+}
+
+// Custom TextField Style
+struct CustomTextFieldStyle: TextFieldStyle {
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .padding()
+            .background(Colors.surface)
+            .foregroundColor(Colors.textPrimary)
+            .cornerRadius(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Colors.textSecondary.opacity(0.3), lineWidth: 1)
+            )
     }
 }

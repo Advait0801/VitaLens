@@ -57,7 +57,7 @@ class ProfileViewModel: ObservableObject {
             // Notify AuthViewModel of logout
             NotificationCenter.default.post(name: .userDidLogout, object: nil)
             
-        } catch let error as AuthError {
+        } catch _ as AuthError {
             // Even if API call fails, clear local tokens
             try? keychainService.deleteAll()
             isLoggingOut = false

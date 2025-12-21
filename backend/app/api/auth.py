@@ -131,6 +131,19 @@ async def refresh_token(token_data: RefreshTokenRequest):
         )
 
 
+@router.post("/logout")
+async def logout(current_user: User = Depends(get_current_user)):
+    """
+    Logout endpoint.
+    Note: With JWT tokens, logout is primarily client-side (token deletion).
+    This endpoint exists for consistency and potential future token blacklisting.
+    """
+    return {
+        "message": "Logged out successfully",
+        "detail": "Please delete the tokens on the client side"
+    }
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
     """Get current user information"""

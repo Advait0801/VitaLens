@@ -136,4 +136,72 @@ class AuthService {
             throw AuthError.decodingError
         }
     }
+    
+    /// Logout - calls backend logout endpoint
+    func logout() async throws {
+        guard let url = URL(string: "\(APIConfig.authURL)/logout") else {
+            throw AuthError.invalidURL
+        }
+        
+        guard let token = try? KeychainService.shared.get(forKey: "access_token") else {
+            // No token to logout, consider it successful
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+        
+        // Accept 200-299 and 401 (unauthorized means token already invalid)
+        guard (200...299).contains(httpResponse.statusCode) || httpResponse.statusCode == 401 else {
+            let errorMessage = try? JSONDecoder().decode([String: String].self, from: Data())
+            throw AuthError.httpError(
+                statusCode: httpResponse.statusCode,
+                message: errorMessage?["detail"]
+            )
+        }
+    }
+    
+    /// Get current user information
+    func getCurrentUser() async throws -> UserResponse {
+        guard let url = URL(string: "\(APIConfig.authURL)/me") else {
+            throw AuthError.invalidURL
+        }
+        
+        guard let token = try? KeychainService.shared.get(forKey: "access_token") else {
+            throw AuthError.httpError(statusCode: 401, message: "Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let errorMessage = try? JSONDecoder().decode([String: String].self, from: data)
+            throw AuthError.httpError(
+                statusCode: httpResponse.statusCode,
+                message: errorMessage?["detail"]
+            )
+        }
+        
+        do {
+            return try JSONDecoder().decode(UserResponse.self, from: data)
+        } catch {
+            throw AuthError.decodingError
+        }
+    }
 }

@@ -29,13 +29,6 @@ struct MealUploadView: View {
             GeometryReader { geometry in
                 ScrollView {
                     VStack(spacing: LayoutHelper.adaptiveSpacing(horizontalSizeClass)) {
-                        // Header
-//                        Text("Upload Meal")
-//                            .font(.system(size: LayoutHelper.isIPad(horizontalSizeClass) ? 36 : 28, weight: .bold))
-//                            .foregroundColor(Colors.textPrimary)
-//                            .padding(.top, LayoutHelper.adaptivePadding(horizontalSizeClass))
-//                            .frame(maxWidth: .infinity, alignment: .leading)
-                        
                         // File Selection Section
                         VStack(spacing: LayoutHelper.adaptiveSpacing(horizontalSizeClass, base: 16)) {
                             Text("Select File")

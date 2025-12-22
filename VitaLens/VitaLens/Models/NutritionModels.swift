@@ -73,3 +73,20 @@ struct TodayNutritionSummary {
         mealCount: 0
     )
 }
+
+// MARK: - Health Insights Response
+struct HealthInsightsResponse: Codable {
+    let periodDays: Int
+    let nutrientSummary: [String: Double]
+    let explanation: String
+    let recommendations: String
+    let disclaimer: String
+    
+    enum CodingKeys: String, CodingKey {
+        case periodDays = "period_days"
+        case nutrientSummary = "nutrient_summary"
+        case explanation
+        case recommendations
+        case disclaimer
+    }
+}

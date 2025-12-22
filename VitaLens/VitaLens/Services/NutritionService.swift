@@ -134,4 +134,46 @@ class NutritionService {
             throw NutritionError.decodingError
         }
     }
+    
+    /// Get health insights with LLM-generated explanations
+    func getHealthInsights(days: Int = 7) async throws -> HealthInsightsResponse {
+        guard let url = URL(string: "\(APIConfig.baseURL)/nutrition/insights") else {
+            throw NutritionError.invalidURL
+        }
+        
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "days", value: "\(days)")]
+        
+        guard let finalURL = components?.url else {
+            throw NutritionError.invalidURL
+        }
+        
+        var request = URLRequest(url: finalURL)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(try getAuthHeader(), forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NutritionError.invalidResponse
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                throw NutritionError.unauthorized
+            }
+            let errorMessage = try? JSONDecoder().decode([String: String].self, from: data)
+            throw NutritionError.httpError(
+                statusCode: httpResponse.statusCode,
+                message: errorMessage?["detail"]
+            )
+        }
+        
+        do {
+            return try JSONDecoder().decode(HealthInsightsResponse.self, from: data)
+        } catch {
+            throw NutritionError.decodingError
+        }
+    }
 }

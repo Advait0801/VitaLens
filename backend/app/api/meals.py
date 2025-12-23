@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from pathlib import Path
 import os
 import uuid
@@ -71,7 +71,13 @@ async def upload_meal(
             # For CSV, read directly
             with open(file_path, "r") as f:
                 raw_text = f.read()
+        
+        # Log extracted text length for debugging
+        print(f"Extracted {len(raw_text)} characters from {source_type.value} file")
+        if not raw_text or len(raw_text.strip()) < 10:
+            print(f"WARNING: OCR extracted very little text: '{raw_text[:100]}'")
     except Exception as e:
+        print(f"OCR extraction error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to extract text: {str(e)}"
@@ -79,15 +85,27 @@ async def upload_meal(
     
     # Normalize food items using LLM
     normalized_data = await llm_service.normalize_food_text(raw_text)
+    print(f"LLM normalization result: is_nutrition_label={normalized_data.get('is_nutrition_label')}, "
+          f"nutrients_count={len(normalized_data.get('nutrients', []))}, "
+          f"food_items_count={len(normalized_data.get('food_items', []))}")
     
     # Create meal
+    # Normalize meal_date to timezone-naive datetime for consistent storage
+    if meal_date:
+        # If meal_date is provided and timezone-aware, convert to naive UTC
+        if meal_date.tzinfo is not None:
+            meal_date = meal_date.replace(tzinfo=None)
+    else:
+        # Default to current UTC time as timezone-naive
+        meal_date = datetime.now(timezone.utc).replace(tzinfo=None)
+    
     meal = Meal(
         user_id=current_user.id,
         meal_type=meal_type,
         source_type=source_type,
         source_file_path=str(file_path),
         raw_text=raw_text,
-        meal_date=meal_date or datetime.utcnow()
+        meal_date=meal_date
     )
     
     db.add(meal)
@@ -111,15 +129,39 @@ async def upload_meal(
         await db.flush()
         
         # Create nutrients directly from label data
+        created_nutrients_count = 0
         for nutrient_data in nutrients_data:
-            nutrient = Nutrient(
-                food_item_id=food_item.id,
-                name=nutrient_data.get("name", "").lower().replace(" ", "_"),
-                value=float(nutrient_data.get("value", 0)),
-                unit=nutrient_data.get("unit", "g"),
-                per_100g=None  # Not applicable for nutrition labels
-            )
-            db.add(nutrient)
+            nutrient_name = nutrient_data.get("name", "").strip()
+            nutrient_value = nutrient_data.get("value", 0)
+            nutrient_unit = nutrient_data.get("unit", "g")
+            
+            # Skip if name is empty or value is invalid
+            if not nutrient_name:
+                print(f"WARNING: Skipping nutrient with empty name: {nutrient_data}")
+                continue
+            
+            try:
+                # Normalize nutrient name
+                normalized_name = nutrient_name.lower().replace(" ", "_")
+                nutrient_value_float = float(nutrient_value) if nutrient_value is not None else 0.0
+                
+                nutrient = Nutrient(
+                    food_item_id=food_item.id,
+                    name=normalized_name,
+                    value=nutrient_value_float,
+                    unit=nutrient_unit,
+                    per_100g=None  # Not applicable for nutrition labels
+                )
+                db.add(nutrient)
+                created_nutrients_count += 1
+            except (ValueError, TypeError) as e:
+                print(f"WARNING: Failed to create nutrient {nutrient_name}: {e}, data: {nutrient_data}")
+                continue
+        
+        print(f"Created {created_nutrients_count} nutrients from nutrition label")
+        
+        if created_nutrients_count == 0:
+            print(f"WARNING: No nutrients were created from nutrition label. Raw data: {nutrients_data}")
     else:
         # Handle regular food items list
         food_items_data = normalized_data.get("food_items", [])
@@ -175,12 +217,22 @@ async def create_meal(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a meal manually"""
+    # Normalize meal_date to timezone-naive datetime for consistent storage
+    meal_date_value = meal_data.meal_date
+    if meal_date_value:
+        # If meal_date is provided and timezone-aware, convert to naive UTC
+        if meal_date_value.tzinfo is not None:
+            meal_date_value = meal_date_value.replace(tzinfo=None)
+    else:
+        # Default to current UTC time as timezone-naive
+        meal_date_value = datetime.now(timezone.utc).replace(tzinfo=None)
+    
     meal = Meal(
         user_id=current_user.id,
         meal_type=meal_data.meal_type,
         source_type=MealSource.MANUAL,
         notes=meal_data.notes,
-        meal_date=meal_data.meal_date or datetime.utcnow()
+        meal_date=meal_date_value
     )
     
     db.add(meal)

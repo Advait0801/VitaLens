@@ -12,7 +12,8 @@ class LLMService:
     def __init__(self):
         self.base_url = settings.OLLAMA_BASE_URL
         self.model = settings.OLLAMA_MODEL
-        self.client = httpx.AsyncClient(timeout=60.0)
+        # Increased timeout for LLM processing (nutrition label parsing can take longer)
+        self.client = httpx.AsyncClient(timeout=180.0)
     
     async def normalize_food_text(self, raw_text: str) -> Dict[str, any]:
         """
@@ -25,25 +26,48 @@ class LLMService:
             ["nutrition facts", "calories", "total fat", "serving size", "daily value"])
         
         if is_nutrition_label:
-            prompt = f"""This is a nutrition facts label. Extract the nutritional information.
+            prompt = f"""This is a nutrition facts label. Extract ALL nutritional information from the text.
+
 Return a JSON object with:
 - "is_nutrition_label": true
-- "serving_size": the serving size text (e.g., "1 Tbsp (21g)")
-- "servings_per_container": number of servings
-- "nutrients": an array of nutrient objects, each with "name", "value" (number), and "unit"
+- "serving_size": the serving size text (e.g., "1 Serving (720g)" or "1 cup (255g)")
+- "servings_per_container": number of servings per container (if mentioned)
+- "nutrients": an array of ALL nutrient objects found, each with:
+  * "name": normalized nutrient name (use lowercase, underscores: calories, total_fat, saturated_fat, trans_fat, cholesterol, sodium, total_carbohydrate, dietary_fiber, total_sugars, added_sugars, protein, vitamin_d, calcium, iron, potassium, etc.)
+  * "value": numeric value (float or int)
+  * "unit": unit of measurement (g, mg, mcg, kcal, etc.)
 
-Text: {raw_text}
+IMPORTANT:
+- Extract ALL nutrients mentioned in the label, not just the main ones
+- Convert percentage values to actual amounts if needed (e.g., if it says "Total Fat 16g (21%)", use 16g, not 21%)
+- Use standard nutrient names: calories, total_fat, saturated_fat, cholesterol, sodium, total_carbohydrate, dietary_fiber, total_sugars, added_sugars, protein, vitamin_d, calcium, iron, potassium
+- If a value is 0, still include it (e.g., "Trans Fat 0g")
+- Parse numbers carefully - handle decimals, fractions, and various formats
 
-Return only valid JSON, no other text. Example:
+Text to parse:
+{raw_text}
+
+Return only valid JSON, no other text. Example format:
 {{
   "is_nutrition_label": true,
-  "serving_size": "1 cup (255g)",
-  "servings_per_container": 2,
+  "serving_size": "1 Serving (720g)",
+  "servings_per_container": 4,
   "nutrients": [
-    {{"name": "calories", "value": 220, "unit": "kcal"}},
-    {{"name": "fat", "value": 5, "unit": "g"}},
-    {{"name": "carbs", "value": 35, "unit": "g"}},
-    {{"name": "protein", "value": 9, "unit": "g"}}
+    {{"name": "calories", "value": 570, "unit": "kcal"}},
+    {{"name": "total_fat", "value": 16, "unit": "g"}},
+    {{"name": "saturated_fat", "value": 2.5, "unit": "g"}},
+    {{"name": "trans_fat", "value": 0, "unit": "g"}},
+    {{"name": "cholesterol", "value": 155, "unit": "mg"}},
+    {{"name": "sodium", "value": 2170, "unit": "mg"}},
+    {{"name": "total_carbohydrate", "value": 56, "unit": "g"}},
+    {{"name": "dietary_fiber", "value": 7, "unit": "g"}},
+    {{"name": "total_sugars", "value": 42, "unit": "g"}},
+    {{"name": "added_sugars", "value": 9, "unit": "g"}},
+    {{"name": "protein", "value": 53, "unit": "g"}},
+    {{"name": "vitamin_d", "value": 0.1, "unit": "mcg"}},
+    {{"name": "calcium", "value": 80, "unit": "mg"}},
+    {{"name": "iron", "value": 3.4, "unit": "mg"}},
+    {{"name": "potassium", "value": 1370, "unit": "mg"}}
   ]
 }}"""
         else:
@@ -79,6 +103,9 @@ Return only valid JSON, no other text. Example:
             # Extract JSON from response
             import json
             response_text = result.get("response", "")
+            print(f"LLM raw response length: {len(response_text)} chars")
+            print(f"LLM raw response preview: {response_text[:500]}")
+            
             # Try to extract JSON from the response
             try:
                 # Remove markdown code blocks if present
@@ -88,14 +115,22 @@ Return only valid JSON, no other text. Example:
                     response_text = response_text.split("```")[1].split("```")[0]
                 
                 parsed = json.loads(response_text.strip())
+                print(f"LLM parsed JSON keys: {list(parsed.keys()) if isinstance(parsed, dict) else 'Not a dict'}")
                 
                 # Handle nutrition label response
                 if isinstance(parsed, dict) and parsed.get("is_nutrition_label"):
+                    nutrients = parsed.get("nutrients", [])
+                    print(f"LLM extracted {len(nutrients)} nutrients from nutrition label")
+                    if nutrients:
+                        print(f"First few nutrients: {nutrients[:3]}")
+                    else:
+                        print("WARNING: LLM returned empty nutrients array!")
+                    
                     return {
                         "is_nutrition_label": True,
                         "serving_size": parsed.get("serving_size", "1 serving"),
                         "servings_per_container": parsed.get("servings_per_container", 1),
-                        "nutrients": parsed.get("nutrients", []),
+                        "nutrients": nutrients,
                         "food_items": []
                     }
                 # Handle food items list response
@@ -108,11 +143,26 @@ Return only valid JSON, no other text. Example:
                 elif isinstance(parsed, list):
                     return {"is_nutrition_label": False, "food_items": parsed}
                 else:
+                    print(f"WARNING: LLM returned unexpected format: {type(parsed)}")
                     return {"is_nutrition_label": False, "food_items": []}
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as je:
+                print(f"LLM JSON decode error: {je}")
+                print(f"Failed to parse response text: {response_text[:300]}")
                 return {"is_nutrition_label": False, "food_items": []}
+        except httpx.TimeoutException as te:
+            print(f"LLM request timed out after 120 seconds. Ollama may be slow or the model may not be loaded.")
+            print(f"Check if Ollama is running: docker compose ps ollama")
+            print(f"Check if model is loaded: docker exec vitalens-ollama ollama list")
+            print(f"To load the model, run: docker exec vitalens-ollama ollama pull {self.model}")
+            return {"is_nutrition_label": False, "food_items": []}
+        except httpx.ConnectError as ce:
+            print(f"LLM connection error: Cannot connect to Ollama at {self.base_url}")
+            print(f"Check if Ollama service is running: docker compose ps ollama")
+            return {"is_nutrition_label": False, "food_items": []}
         except Exception as e:
-            print(f"LLM normalization failed: {e}")
+            print(f"LLM normalization failed: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return {"is_nutrition_label": False, "food_items": []}
     
     async def generate_health_insight(

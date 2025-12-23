@@ -3,7 +3,7 @@ Nutrition and health insights routes
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 from typing import Optional
 from datetime import date, datetime, timedelta, timezone
@@ -28,22 +28,39 @@ async def get_daily_nutrition(
     if not target_date:
         target_date = datetime.now(timezone.utc).date()
     
-    # Get all meals for the date (timezone-naive to match DB column)
-    start_datetime = datetime.combine(target_date, datetime.min.time())
-    end_datetime = datetime.combine(target_date, datetime.max.time())
+    # Get all meals for the date using date range comparison
+    # meal_date is stored as timezone-naive DateTime (assumed to be UTC)
+    # Create datetime range covering the entire target date (00:00:00 to 23:59:59.999999)
+    start_of_day = datetime.combine(target_date, datetime.min.time())
+    end_of_day = datetime.combine(target_date, datetime.max.time())
     
     result = await db.execute(
         select(Meal)
         .where(
             and_(
                 Meal.user_id == current_user.id,
-                Meal.meal_date >= start_datetime,
-                Meal.meal_date <= end_datetime
+                Meal.meal_date >= start_of_day,
+                Meal.meal_date <= end_of_day
             )
         )
         .options(selectinload(Meal.food_items).selectinload(FoodItem.nutrients))
     )
     meals = result.scalars().all()
+    
+    # Debug logging - check ALL meals for this user to see what dates exist
+    all_meals_result = await db.execute(
+        select(Meal).where(Meal.user_id == current_user.id).order_by(Meal.meal_date.desc()).limit(10)
+    )
+    all_meals = all_meals_result.scalars().all()
+    print(f"Querying meals for date: {target_date} (UTC range: {start_of_day} to {end_of_day})")
+    print(f"Found {len(meals)} meals for user {current_user.id} on {target_date}")
+    print(f"Recent meals for user {current_user.id} (last 10):")
+    for meal in all_meals:
+        meal_date_str = str(meal.meal_date) if meal.meal_date else "None"
+        meal_date_obj = meal.meal_date
+        meal_date_only = meal_date_obj.date() if meal_date_obj else None
+        matches = "✓" if meal_date_only == target_date else "✗"
+        print(f"  {matches} Meal ID {meal.id}: meal_date = {meal_date_str}, extracted date = {meal_date_only}")
     
     # Aggregate nutrients
     nutrient_totals = {}
@@ -75,16 +92,15 @@ async def get_nutrition_summary(
     end_date = date.today()
     start_date = end_date - timedelta(days=days-1)
     
-    start_datetime = datetime.combine(start_date, datetime.min.time())
-    end_datetime = datetime.combine(end_date, datetime.max.time())
+    # Use date comparison for consistency
     
     result = await db.execute(
         select(Meal)
         .where(
             and_(
                 Meal.user_id == current_user.id,
-                Meal.meal_date >= start_datetime,
-                Meal.meal_date <= end_datetime
+                func.date(Meal.meal_date) >= start_date,
+                func.date(Meal.meal_date) <= end_date
             )
         )
         .options(selectinload(Meal.food_items).selectinload(FoodItem.nutrients))
@@ -129,16 +145,15 @@ async def get_health_insights(
     end_date = date.today()
     start_date = end_date - timedelta(days=days-1)
     
-    start_datetime = datetime.combine(start_date, datetime.min.time())
-    end_datetime = datetime.combine(end_date, datetime.max.time())
+    # Use date comparison for consistency
     
     result = await db.execute(
         select(Meal)
         .where(
             and_(
                 Meal.user_id == current_user.id,
-                Meal.meal_date >= start_datetime,
-                Meal.meal_date <= end_datetime
+                func.date(Meal.meal_date) >= start_date,
+                func.date(Meal.meal_date) <= end_date
             )
         )
         .options(selectinload(Meal.food_items).selectinload(FoodItem.nutrients))

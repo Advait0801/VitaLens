@@ -54,11 +54,17 @@ class NutritionService {
         }
         
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        if let date = date {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            components?.queryItems = [URLQueryItem(name: "target_date", value: formatter.string(from: date))]
-        }
+        // Always send the date explicitly
+        // Use local calendar to get "today" in user's timezone, not UTC
+        let targetDate = date ?? Date()
+        let calendar = Calendar.current
+        let localDate = calendar.startOfDay(for: targetDate)
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone // Use local timezone for date calculation
+        components?.queryItems = [URLQueryItem(name: "target_date", value: formatter.string(from: localDate))]
         
         guard let finalURL = components?.url else {
             throw NutritionError.invalidURL

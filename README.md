@@ -11,7 +11,6 @@
 [![iOS](https://img.shields.io/badge/iOS-17.0+-lightgrey.svg)](https://developer.apple.com/ios)
 [![Docker](https://img.shields.io/badge/Docker-Compose-blue.svg)](https://www.docker.com)
 [![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-FF6B6B.svg)](https://ollama.ai)
-[![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20DB-FFD93D.svg)](https://www.trychroma.com)
 
 </div>
 
@@ -26,7 +25,7 @@
 - 🤖 **AI-Powered Food Recognition**: OCR extraction with LLM-based normalization for accurate food identification
 - 📊 **Intelligent Nutrition Analysis**: Time-series nutrient tracking with deficiency and excess detection
 - 🔐 **Secure Authentication**: JWT-based authentication with bcrypt password hashing
-- 🐳 **Dockerized Services**: Complete containerized backend with PostgreSQL, Ollama, and ChromaDB
+- 🐳 **Dockerized Services**: Complete containerized backend with PostgreSQL and Ollama
 - 🎨 **Modern UI/UX**: Clean, responsive SwiftUI interface with adaptive layouts and light/dark themes
 - 📈 **Health Risk Assessment**: Automated risk scoring with safety-aware LLM explanations
 - 🔄 **Real-time Analytics**: Interactive charts and trends powered by Swift Charts
@@ -75,15 +74,13 @@
 │   (SwiftUI)     │  REST   │   (Python)       │  Async  │   (Database)    │
 └─────────────────┘         └──────────────────┘         └─────────────────┘
       │                              │
-      │                              ├──────────────┐
-      │                              │              │
-      ▼                              ▼              ▼
-┌─────────────┐              ┌──────────────┐  ┌──────────────┐
-│  JWT Token  │              │  Ollama LLM   │  │  ChromaDB    │
-│  Storage    │              │  (Local)     │  │  (Vector DB) │
-│ (Keychain)  │              └──────────────┘  └──────────────┘
+      │                              │
+      ▼                              ▼
+┌─────────────┐              ┌──────────────┐
+│  JWT Token  │              │  Ollama LLM  │
+│  Storage    │              │  (Local)     │
+│ (Keychain)  │              └──────┬───────┘
 └─────────────┘                     │
-                                    │
                            ┌────────┴────────┐
                            │                 │
                            ▼                 ▼
@@ -104,6 +101,32 @@
 6. **Analysis**: Time-series analysis and risk scoring performed
 7. **Insights**: LLM generates safety-aware health explanations
 8. **Visualization**: iOS app displays data with interactive charts
+
+### Workflow 
+
+1. **User uploads something**  
+   They send a photo of food, a nutrition label (image/PDF), or a CSV. We save the file and decide: is it an image, a PDF, or a CSV?
+
+2. **We get text out of it**  
+   - **Image or PDF**: We need to “read” the picture → that’s **OCR**.  
+     - We **try EasyOCR first** (better for messy/photographed text).  
+     - **If EasyOCR fails** (error or empty text), we **automatically switch to Tesseract** and run OCR again.  
+     - For PDFs we first convert each page to an image, then run the same OCR on each page.  
+   - **CSV**: No OCR — we just read the file as text.
+
+3. **We ask the LLM what’s in that text**  
+   We send the raw text to **Ollama** (local LLM). It either:  
+   - Detects a **nutrition label** → extracts serving size and all nutrients from the label, or  
+   - Treats it as a **list of foods** → returns a list of food names and quantities.  
+   So we always end up with structured “food items” and/or nutrients.
+
+4. **We fill in missing nutrition numbers**  
+   For each food item we need calories, protein, carbs, etc.  
+   - We **try USDA FoodData Central API** first (by food name).  
+   - **If we don’t have a USDA API key**, or **USDA doesn’t return a match**, we use **sensible default values** (e.g. average meal estimates) so the app still works and shows something reasonable.
+
+5. **We save everything**  
+   We create one **Meal** in the database, attach the **FoodItem(s)** and their **Nutrient** rows, and store it for that user and date. Later we use this for the dashboard, trends, and insights.
 
 ---
 
@@ -129,7 +152,6 @@
 
 ### AI & ML Services
 - **LLM**: Ollama (local) - Llama 3.1 / Mistral
-- **Vector Database**: ChromaDB 0.4.18
 - **OCR**: EasyOCR 1.7.0, Tesseract (pytesseract)
 - **Image Processing**: OpenCV, Pillow
 - **PDF Processing**: pdf2image
@@ -142,7 +164,6 @@
   - FastAPI backend service
   - PostgreSQL database
   - Ollama LLM service
-  - ChromaDB vector database
 
 ---
 
@@ -176,7 +197,6 @@
 
 - **USDA FoodData Central** for comprehensive nutrition database
 - **Ollama** for local LLM capabilities
-- **ChromaDB** for vector database functionality
 - **EasyOCR** and **Tesseract** for OCR capabilities
 
 ---
